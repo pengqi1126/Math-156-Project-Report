@@ -1,0 +1,273 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx,subcaption}
+\usepackage{fullpage}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{color}
+\usepackage{blindtext}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[shortlabels]{enumitem}
+\setlength\parindent{0pt}
+\title{Math 156 Report Title}
+\author{Melissa Chang, Samvit Garg, Qi Peng, Deeloc Lopez, Julia Lou, Dasula Dharmakeerthi}
+\date{}
+\begin{document}
+\maketitle
+\abstract{\blindtext}
+\section{Introduction}
+As autonomous vehicles become increasingly prevalent, ensuring their ability to accurately detect and respond to pedestrians is critical for public safety\cite{martinez2018autonomous}. Pedestrian detection is one of the most essential tasks in computer vision for autonomous vehicles, where real-time accuracy and reliability can directly impact decision-making in dynamic environments. This project explores the mathematical foundations of CNNs and demonstrates their effectiveness in pedestrian detection by highlighting their ability to generalize and extract robust features from large-scale datasets\cite{hasan2022pedestrian}. To achieve this, we implement and train the YOLO (You Only Look Once) object detection algorithm on pedestrian-specific datasets and evaluate its performance in a simulated autonomous driving context. By doing so, we aim to bridge the gap between theoretical understanding and practical application of CNN-based detection models.
+\section{Background}
+Convolutional Neural Networks (CNN) is a type of deep learning algorithm that could be used in image classification, segmentation, and object detection. CNNs differ from traditional Artificial Neural Networks (ANNs) by addressing the limitations of fully connected architectures when handling image data, which typically suffers from high dimensionality and parameter redundancy. Instead of connecting every input pixel to every neuron, CNNs use small learnable kernels (e.g., 3×3 or 5×5) that slide across the input. Each kernel functions as a local feature detector and shares the same weights across all positions, and thus significantly reducing the number of parameters~\cite{oshea2015introduction}. CNNs achieve both computational efficiency and strong representational power, making them highly effective for visual tasks. Its ability to learn hierarchical feature representations makes them particularly effective for tasks requiring spatial awareness and pattern recognition\cite{li2021survey}. Object detection, a more complex task than classification, involves both identifying the category of an object and localizing it within an image using bounding boxes. In the context of self-driving cars, pedestrian detection poses unique challenges due to factors such as motion blur, occlusions, varied lighting, and unpredictable human behavior. Specialized pedestrian datasets, such as the Caltech Pedestrian Dataset, JAAD, and CityPerson, offer labeled real-world imagery that captures these complexities. These datasets enable us to train and evaluate models in scenarios that closely mimic real driving environments. Beyond autonomous vehicles, the same detection technology can be applied in areas such as traffic monitoring, public safety, and urban planning.
+\section{Dataset}
+We use the Caltech Pedestrian Dataset~\cite{caltechpedestrian}, which consists of annotated video sequences captured from a moving vehicle in urban traffic scenes. This dataset’s complexity makes it an ideal benchmark for evaluating the robustness of modern object detection models such as YOLO. The data is provided in a pre-split format, with separate .seq files for training and testing, along with corresponding annotation files in .vbb format. For model training, we converted the .vbb files into YOLO-compatible .txt label files, and extracted the video frames from the .seq files into .jpg images
+To preprocess the Caltech Pedestrian dataset for training, we first extracted the labels from the annotation (.vbb) files. During this process, we retained only the objects labeled as person, and discarded all other classes. We further removed occluded individuals and filtered out bounding boxes that were too small. The remaining bounding boxes were converted into YOLO format, with the coordinates normalized relative to the image dimensions, we used the normalized center (x, y) along with the normalized width and height.
+For the image data, we extracted individual frames from the .seq files. We filtered out invalid and abnormally small dimensions frames,  and then all valid images were then resized to 640×480 to maintain a consistent input shape for the model.
+\section{Model}
+Our program uses YOLO, an existing CNN architecture widely used in autonomous driving. YOLO stands for you only look once, and this captures the idea that this architecture only processes the image once - there is no preprocessing or multiple pass throughs, which in our case was useful as pedestrian detection needs to happen in real time and produce immediate results, which is achievable through this model. 
+
+Yolo shares many of the features that a typical CNN will have, however newer models of YOLOv5, are no longer classified as CNNs, and instead are classified as FCNs (Fully convolutional network). This is because newer models of YOLO, including YOLOv5, no longer use fully connected layers, as they are inefficient and do not suit the task of live detection, with no pre-processing. This is because fully connected layers , fix the input size, and are hard to adapt to images of different resolution, while also being parameter heavy and inefficient. However, other classic CNN layers are used such as convolution layers, and pooling layers. 
+
+(if we used YOLOv2 and beyond) The convolution layers in our model use deeply trained CNNs such as Darknet 19 and Darknet 52, which are themselves CNNs, that have been trained over vast data sets. For example, our model ()() uses ()(), which has ()()convultation layers and ()() pooling layers, and this will detect features. In addition, Relu is also used, with the model adopting leaky relu which helps prevent the ‘dying relu’ problem.
+
+Moreover, YOLO also uses pooling layers, where most pooling layers use max pooling with a stride of a 2 and 2x2 kernel. Essentially, this means the model looks at a 2x2 area, and represents it with the max element from this kernel. Then the model moves over 2, and repeats, essentially downsizing the amount of information that needs to be processed, while still preserving the features that were detected.
+
+\section{Methodology}
+
+\subsection{Step 1: Input Image}
+The input image $\mathbf{X} \in \mathbb{R}^{H \times W \times 3}$ is resized to a fixed size (e.g., $640 \times 640$) and normalized (so pixel values are between 0 and 1). So we have a fixed height and width, and a depth of 3 for RGB color. \cite{glenn2020yolov5}
+
+\textbf{YOLOv1 Comparison:} Used $448 \times 448$ input resolution, which amounted to using less information to make the prediction. \cite{redmon2016you}
+
+\subsection{Step 2: Backbone – Feature Extraction (CSPDarknet53)}
+
+The backbone extracts features using the CSPDarknet53 network, which consists of:
+
+\begin{itemize}
+    \item Residual connections
+    \item Cross-Stage Partial (CSP) blocks
+    \item Convolutional layers
+    \item Batch normalization
+    \item SiLU (Swish) activation
+\end{itemize}
+
+This step aims to find meaningful features by detecting patterns in the image data. CSPDarknet53 is a complicated model. It is a deep convolutional neural network used in YOLOv5. Though it is technically feed-forward, it is not fully connected and is also sparse, so each neuron does not see the whole input. It is specialized for image data and is efficient. An overview of how it works is given below. \cite{wang2020cspnet}
+
+\subsubsection*{2.1 Residual Blocks and Cross-Stage Partial (CSP) Block}
+
+Each residual block computes:
+
+\[
+\mathbf{Y} = \mathbf{X} + f(\mathbf{X}; \theta)
+\]
+
+Where $f(\cdot)$ is a series of convolution, normalization, and activation layers. This should improve our ability to compute gradients.
+
+The input is split into two paths: one part goes through a series of residual blocks, while the other bypasses them:
+
+\[
+\begin{aligned}
+\mathbf{X}_1, \mathbf{X}_2 &= \text{Split}(\mathbf{X}) \\
+\mathbf{Y}_1 &= f_{\text{res}}(\mathbf{X}_1) \\
+\mathbf{Y} &= \text{Concat}(\mathbf{Y}_1, \mathbf{X}_2)
+\end{aligned}
+\]
+
+This reduces computation and improves gradient flow. Both of these mechanisms are optionally applied to each stage of training.
+
+\subsubsection*{2.2 Convolution Layer}
+Feature extraction is where a lot of the work happens. An overview of the details is as follows:
+
+\begin{itemize}
+    \item \textbf{Kernel Size} (\( k \times k \)): The spatial size of the filter used in the convolution. Common sizes include \(3 \times 3\) and \(1 \times 1\).
+    \item \textbf{Stride} (\(s\)): The number of pixels the filter moves when sliding across the input. A stride of 1 preserves spatial size, while a stride of 2 reduces it by half.
+    \item \textbf{Padding} (\(p\)): Number of zeros added to the border of the input. Padding controls the spatial size of the output. Zero-padding allows edge features to be preserved.
+    \item \textbf{Residual Unit}: A module with a skip connection, allowing input to bypass layers, which improves gradient flow during backpropagation.
+    \item \textbf{CSP Block}: A structure that splits input into two paths to improve learning efficiency. One path undergoes transformations (via residual units); the other skips them. They are merged later via concatenation.
+    \item \textbf{Feature Map}: The output of a convolutional layer, representing the presence of learned features at various spatial locations.
+    \item \textbf{Convolution (Conv)}: A linear operation that applies a filter (kernel) to local patches of the input to extract features. Initial convolutions extract low level features like corners or edges. There are also some downsampling convolutions that use a stride of 2 to reduce resolution and allow more depth in detection.
+\end{itemize}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}lllll@{}}
+
+\textbf{Stage} & \textbf{Output Size} & \textbf{Layers} & \textbf{Type} & \textbf{\# Residual Units} \\
+0 & $416 \times 416 \times 3$ & 1 & $3 \times 3$ Conv & 0 \\
+1 & $208 \times 208 \times 32$ & 1 & $3 \times 3$ Conv (stride 2) & 1 \\
+2 & $104 \times 104 \times 64$ & 1 + CSP Block & $3 \times 3$ Conv + CSP & 2 \\
+3 & $52 \times 52 \times 128$ & 1 + CSP Block & $3 \times 3$ Conv + CSP & 8 \\
+4 & $26 \times 26 \times 256$ & 1 + CSP Block & $3 \times 3$ Conv + CSP & 8 \\
+5 & $13 \times 13 \times 512$ & 1 + CSP Block & $3 \times 3$ Conv + CSP & 4 \\
+\end{tabular}
+\caption{High-level structure of CSPDarknet53}
+\end{table} \cite{glenn2020yolov5}
+
+Given an input tensor \( X \in \mathbb{R}^{H \times W \times C_{\text{in}}} \), a 2D convolutional layer with kernel size \( k \times k \), stride \( s \), and padding \( p \), computes the output tensor \( Y \in \mathbb{R}^{H_{\text{out}} \times W_{\text{out}} \times C_{\text{out}}} \) as:
+
+\[
+Y_{i,j,c} = \sum_{m=1}^{k} \sum_{n=1}^{k} \sum_{d=1}^{C_{\text{in}}} W_{m,n,d,c} \cdot X_{i+m-1,j+n-1,d} + b_c
+\]
+
+Where:
+\begin{itemize}
+    \item \( X \): Input feature map
+    \item \( W \): Convolution filter weights
+    \item \( b_c \): Bias term for output channel \( c \)
+    \item \( Y \): Output feature map
+    \item \( i, j \): Spatial location of the output
+    \item \( c \): Output channel index
+\end{itemize}
+
+The output dimensions are given by:
+
+\[
+H_{\text{out}} = \left\lfloor \frac{H + 2p - k}{s} \right\rfloor + 1, \quad
+W_{\text{out}} = \left\lfloor \frac{W + 2p - k}{s} \right\rfloor + 1
+\] \cite{dumoulin2016guide}
+
+\subsubsection*{2.3 Batch Normalization}
+
+Normalizes the output of each convolutional channel, which should speed up training:
+
+\[
+\hat{x}_i = \frac{x_i - \mu}{\sqrt{\sigma^2 + \epsilon}}, \quad y_i = \gamma \hat{x}_i + \beta
+\] \cite{bochkovskiy2020yolov4}
+\subsubsection*{2.4 Activation (SiLU)}
+
+YOLOv5 uses the SiLU (Sigmoid Linear Unit, smooth which is an advantage over ReLU) activation:
+
+\[
+\text{SiLU}(x) = x \cdot \sigma(x) = \frac{x}{1 + e^{-x}}
+\] \cite{bochkovskiy2020yolov4}
+
+
+\textbf{YOLOv1:} Used a plain custom CNN with 24 convolutional layers and 2 fully connected layers.
+
+\subsection{Step 3: Neck – Feature Aggregation (PANet)}
+
+The neck uses a "feature pyramid network searching" that combines deep and shallow features. Essentially, we make sure the model is able to detect objects of different sizes. Then, the PANet adds a bottom-up path, which means it refines details on where exactly things are:
+
+\[
+\mathbf{F}' = f_{\text{neck}}(\mathbf{F})
+\] \cite{liu2018panet}
+
+\subsection{Step 4: Detection Head – Predictions}
+
+At each spatial location of the feature map, for each anchor box, the model predicts:
+
+\begin{itemize}[leftmargin=2em]
+    \item $t_x, t_y, t_w, t_h$: encoded box parameters (where the box is)
+    \item $t_o$: objectness score (likeilihood of there being an object)
+    \item $t_c$: class probabilities (vector of length $K$ for $K$ classes, trying to determine which object it is)
+\end{itemize} 
+
+\textbf{Box Decoding:}
+
+Let $(c_x, c_y)$ be the top-left coordinates of the grid cell, and $(a_w, a_h)$ the anchor dimensions (predetermined).
+
+\[
+\begin{aligned}
+b_x &= \sigma(t_x) + c_x \\
+b_y &= \sigma(t_y) + c_y \\
+b_w &= a_w \cdot e^{t_w} \\
+b_h &= a_h \cdot e^{t_h}
+\end{aligned}
+\]
+
+The objectness and class scores are also passed through a sigmoid:
+\[
+P_{\text{obj}} = \sigma(t_o), \quad P_{\text{class}} = \sigma(t_c)
+\] \cite{redmon2018yolov3}
+
+\textbf{YOLOv1:} Did not use anchors or exponential scaling, and predicted only 2 boxes per grid cell. \cite{redmon2016you}
+
+\subsection{Step 5: Loss Function}
+
+The total loss function is composed of three parts:
+\[
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{box}} + \mathcal{L}_{\text{obj}} + \mathcal{L}_{\text{cls}}
+\]
+
+\subsubsection*{1. Bounding Box Regression Loss (CIoU)}
+
+YOLOv5 uses Complete IoU (CIoU) loss, where we compare the predicted box to the true box:
+
+\[
+\mathcal{L}_{\text{box}} = 1 - \text{CIoU}(B, B^{\text{gt}})
+\]
+
+Where:
+\[
+\text{CIoU} = \text{IoU} - \frac{\rho^2(\mathbf{b}, \mathbf{b}^{\text{gt}})}{c^2} - \alpha v
+\] \cite{zheng2020distanceiou}
+
+- $\text{IoU}$: Intersection over Union  
+- $\rho$: Euclidean distance between box centers  
+- $c$: diagonal length of the smallest enclosing box  
+- $v$: aspect ratio consistency  
+- $\alpha$: tuning to give importance to aspect ratio
+
+\subsubsection*{2. Objectness Loss}
+
+Binary cross-entropy (BCE) loss, compare predicted objectness to if there is truly an object:
+
+\[
+\mathcal{L}_{\text{obj}} = - \left[ y_{\text{obj}} \log \hat{p}_{\text{obj}} + (1 - y_{\text{obj}}) \log (1 - \hat{p}_{\text{obj}}) \right]
+\] \cite{zheng2020distanceiou}
+
+\subsubsection*{3. Classification Loss}
+
+BCE loss for each class (multi-label classification), compare the predicrted class likelihoods to which class it truly belonged to:
+
+\[
+\mathcal{L}_{\text{cls}} = - \sum_{k=1}^{K} \left[ y_k \log \hat{p}_k + (1 - y_k) \log (1 - \hat{p}_k) \right]
+\] \cite{zheng2020distanceiou}
+
+\textbf{YOLOv1:} Used MSE (L2 loss) for all components, including classification, which performed poorly for probabilities. \cite{redmon2016you}
+
+\subsection{Step 6: Optimization}
+
+Training is performed with SGD or Adam. With learning rate $\eta$, weights $\theta$ are updated as:
+
+\[
+\omega \leftarrow \omega - \eta \nabla_\omega \mathcal{L}_{\text{total}}
+\]\cite{loshchilov2017sgdr}
+
+This is where we made modifications:
+\begin{itemize}
+    \item Decaying learning rate
+    \item Chose ADAM optimizer (?)
+    \item Chose hyperparameters, custom training loop.
+\end{itemize} 
+
+\subsection{Step 7: Inference}
+
+For an unseen image, predictions are decoded, and scores are calculated:
+
+\[
+P_{\text{final}} = P_{\text{obj}} \cdot P_{\text{class}}
+\] \cite{glenn2020yolov5}
+
+\subsection{Step 8: Post-Processing – Non-Max Suppression}
+
+Multiple boxes may be output for the same object so this step is meant to choose the best one and discard the overlapping ones. For overlapping boxes $B_1$ and $B_2$:
+
+\[
+\text{IoU}(B_1, B_2) = \frac{\text{area}(B_1 \cap B_2)}{\text{area}(B_1 \cup B_2)}
+\] \cite{hosang2017learningnms}
+
+Boxes with $\text{IoU} > \tau$ (typically $\tau = 0.5$) are suppressed.
+\subsection{Our Modifications}
+    We first implemented YOLOv1 from scratch, but found it difficult to train on a large amount of data. We included it as a model for the concept of the final model. Our final model is a modified YOLOv5, which was outlined above. We used existing YOLOv5 architecture, which greatly improves upon YOLOv1. It has a very complex loss function and implemented many useful improvements. For our purposes, we modified this model as well. EDIT
+\section{Results}
+\blindtext % Dummy text
+\section{Conclusion}
+\blindtext % Dummy text
+\section{Author Contributions}
+\blindtext % Dummy text
+\bibliography {project-main.bib}
+\bibliographystyle{plain}
+
+\end{document}
+
